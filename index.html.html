@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>주식 수익률 계산기 </title>
+    <style>
+        /* 폰트: 상업적 이용 가능한 무료 폰트 (Pretendard) 및 시스템 기본 폰트 적용 */
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        body { font-family: 'Pretendard', -apple-system, sans-serif; padding: 10px; background-color: #f2f4f6; color: #333; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+        .container { width: 100%; max-width: 440px; background: white; padding: 30px; border-radius: 28px; box-shadow: 0 15px 45px rgba(0,0,0,0.06); }
+        h2 { text-align: center; font-size: 21px; font-weight: 700; margin-bottom: 25px; color: #191f28; margin-top: 0; }
+        
+        .input-row { margin-bottom: 18px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #4e5968; }
+        
+        /* 3. 통화 단위 선택 버튼 (요청 3 반영: 버튼형) */
+        .currency-toggle { display: flex; gap: 8px; margin-bottom: 22px; }
+        .currency-btn { flex: 1; padding: 14px; background-color: #f2f4f6; border: none; border-radius: 12px; color: #4e5968; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; outline: none; text-align: center; }
+        .currency-btn.active { background-color: #3182f6; color: white; }
+        
+        /* 입력창 컨트롤 박스 */
+        .input-control { display: flex; align-items: center; background: #fafafa; border: 1px solid #e5e8eb; border-radius: 14px; padding: 4px 12px; }
+        .input-wrapper { flex: 1; display: flex; align-items: center; justify-content: flex-end; position: relative; }
+        
+        /* 입력창 스타일 */
+        .input-control input { width: 100%; border: none; background: transparent; font-size: 16px; padding: 11px 0; outline: none; text-align: right; margin-right: 12px; font-family: inherit; }
+        
+        /* 1. 상하 화살표 제거 (요청 1 반영: 크롬/에지/파이어폭스 대응) */
+        .input-control input::-webkit-outer-spin-button,
+        .input-control input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .input-control input[type=number] { -moz-appearance: textfield; }
+
+        /* 2. 단위 텍스트 우측 정렬 (요청 2 반영: -+ 버튼 바로 옆 딱 붙게) */
+        .unit-text { font-size: 15px; color: #4e5968; pointer-events: none; flex-shrink: 0; white-space: nowrap; }
+        
+        /* 우측 - + 버튼 그룹 */
+        .btn-group { display: flex; gap: 5px; border-left: 1px solid #e5e8eb; padding-left: 10px; margin-left: 12px; }
+        .btn-step { width: 34px; height: 34px; border: none; background: #fff; font-size: 20px; color: #3182f6; cursor: pointer; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .btn-step:active { background: #e8f3ff; }
+
+        .fee-wrapper { display: flex; gap: 12px; }
+        .fee-item { flex: 1; min-width: 0; }
+
+        button.main-btn { width: 100%; padding: 17px; background-color: #3182f6; color: white; border: none; border-radius: 14px; cursor: pointer; font-size: 17px; font-weight: 700; margin-top: 18px; transition: 0.2s; }
+        button.main-btn:hover { background-color: #1b64da; }
+
+        .result { margin-top: 25px; padding: 22px; background-color: #fafafa; border-radius: 18px; display: none; border: 1px solid #eee; }
+        .result p { display: flex; justify-content: space-between; margin: 10px 0; font-size: 15px; color: #333; }
+        .profit-val { font-size: 18px; font-weight: bold; color: #f04452; }
+        .res-label { color: #8b95a1; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📈 주식 수익 계산기</h2>
+    
+    <label>통화 단위</label>
+    <div class="currency-toggle">
+        <button id="btnUsd" class="currency-btn active" onclick="setCurrency('$')">달러 ($)</button>
+        <button id="btnKrw" class="currency-btn" onclick="setCurrency('원')">원화 (₩)</button>
+    </div>
+
+    <div class="input-row">
+        <label>매수 가격</label>
+        <div class="input-control">
+            <div class="input-wrapper">
+                <input type="number" id="buyPrice" value="0.00">
+                <span class="unit-text currency-label">달러</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn-step" onclick="step('buyPrice', -1)">−</button>
+                <button class="btn-step" onclick="step('buyPrice', 1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-row">
+        <label>매수 수량</label>
+        <div class="input-control">
+            <div class="input-wrapper">
+                <input type="number" id="buyQty" value="1">
+                <span class="unit-text">주</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn-step" onclick="step('buyQty', -1)">−</button>
+                <button class="btn-step" onclick="step('buyQty', 1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-row">
+        <label>매도 가격</label>
+        <div class="input-control">
+            <div class="input-wrapper">
+                <input type="number" id="sellPrice" value="0.00">
+                <span class="unit-text currency-label">달러</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn-step" onclick="step('sellPrice', -1)">−</button>
+                <button class="btn-step" onclick="step('sellPrice', 1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-row">
+        <label>매도 수량</label>
+        <div class="input-control">
+            <div class="input-wrapper">
+                <input type="number" id="sellQty" value="1">
+                <span class="unit-text">주</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn-step" onclick="step('sellQty', -1)">−</button>
+                <button class="btn-step" onclick="step('sellQty', 1)">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fee-wrapper">
+        <div class="fee-item">
+            <label>매수 수수료 (%)</label>
+            <div class="input-control fee-control">
+                <div class="input-wrapper">
+                    <input type="number" id="buyFee" value="0.10" step="0.01">
+                </div>
+                <div class="btn-group">
+                    <button class="btn-step" style="width:28px; height:28px; font-size:16px;" onclick="step('buyFee', -0.01)">−</button>
+                    <button class="btn-step" style="width:28px; height:28px; font-size:16px;" onclick="step('buyFee', 0.01)">+</button>
+                </div>
+            </div>
+        </div>
+        <div class="fee-item">
+            <label>매도 수수료 (%)</label>
+            <div class="input-control fee-control">
+                <div class="input-wrapper">
+                    <input type="number" id="sellFee" value="0.10" step="0.01">
+                </div>
+                <div class="btn-group">
+                    <button class="btn-step" style="width:28px; height:28px; font-size:16px;" onclick="step('sellFee', -0.01)">−</button>
+                    <button class="btn-step" style="width:28px; height:28px; font-size:16px;" onclick="step('sellFee', 0.01)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="main-btn" onclick="calculate()">수익금 계산하기</button>
+
+    <div id="resultBox" class="result">
+        <p><span class="res-label">총 매수 금액 (비용 포함)</span> <span id="resBuy"></span></p>
+        <p><span class="res-label">총 매도 금액 (비용 제외)</span> <span id="resSell"></span></p>
+        <p><span class="res-label">총 발생 수수료</span> <span id="resFee"></span></p>
+        <hr>
+        <p><span>최종 순수익</span> <span id="resProfit" class="profit-val"></span></p>
+        <p><span>최종 수익률</span> <span id="resRate" class="profit-val"></span></p>
+    </div>
+</div>
+
+<script>
+let currentUnit = '$'; // 전역 변수로 현재 통화 관리
+
+// 3. 통화 단위 선택 버튼 로직 (요청 3 반영: 버튼형)
+function setCurrency(unit) {
+    currentUnit = unit;
+    
+    // 버튼 스타일 토글
+    document.getElementById('btnUsd').classList.toggle('active', unit === '$');
+    document.getElementById('btnKrw').classList.toggle('active', unit === '원');
+    
+    // 입력창 내부 단위 텍스트 변경
+    const currencyLabels = document.querySelectorAll('.currency-label');
+    const labelText = unit === '$' ? "달러" : "원";
+    currencyLabels.forEach(el => el.innerText = labelText);
+    
+    // 원화로 변경 시 기존 소수점 가격 반올림 처리
+    if(unit === '원') {
+        const bpEl = document.getElementById('buyPrice');
+        const spEl = document.getElementById('sellPrice');
+        bpEl.value = Math.round(parseFloat(bpEl.value) || 0);
+        spEl.value = Math.round(parseFloat(spEl.value) || 0);
+    }
+}
+
+function step(id, val) {
+    const el = document.getElementById(id);
+    let curr = parseFloat(el.value) || 0;
+    
+    let stepVal = val;
+    // 가격 조정 시 통화에 따른 증감폭 설정 (요청 2 반영: 원화는 10원 단위, 달러는 0.01달러 단위)
+    if(id === 'buyPrice' || id === 'sellPrice') {
+        if(currentUnit === '원') {
+            stepVal = val * 10;
+        } else {
+            stepVal = val * 0.01;
+        }
+    }
+
+    // 소수점 자리수 결정 (수량 및 원화 가격은 소수점 없음)
+    const decimals = (currentUnit === '원' && (id === 'buyPrice' || id === 'sellPrice')) || id.includes('Qty') ? 0 : 2;
+    el.value = (curr + stepVal).toFixed(decimals);
+}
+
+function calculate() {
+    const bPrice = parseFloat(document.getElementById('buyPrice').value) || 0;
+    const bQty = parseFloat(document.getElementById('buyQty').value) || 0;
+    const sPrice = parseFloat(document.getElementById('sellPrice').value) || 0;
+    const sQty = parseFloat(document.getElementById('sellQty').value) || 0;
+    const bFeeR = (parseFloat(document.getElementById('buyFee').value) || 0) / 100;
+    const sFeeR = (parseFloat(document.getElementById('sellFee').value) || 0) / 100;
+
+    // 매수 비용 계산 (원금 + 수수료)
+    const bTotalRaw = bPrice * bQty;
+    const bFeeVal = bTotalRaw * bFeeR;
+    const bFinal = bTotalRaw + bFeeVal;
+
+    // 매도 수령액 계산 (원금 - 수수료)
+    const sTotalRaw = sPrice * sQty;
+    const sFeeVal = sTotalRaw * sFeeR;
+    const sFinal = sTotalRaw - sFeeVal;
+
+    const profit = sFinal - bFinal;
+    const rate = bFinal !== 0 ? (profit / bFinal) * 100 : 0;
+
+    // 결과 출력 포맷팅 (달러 소수점 2자리, 원화 정수)
+    const fmtConfig = { minimumFractionDigits: currentUnit === '$' ? 2 : 0, maximumFractionDigits: 2 };
+    const curFmt = (v) => (currentUnit === '$' ? '$' : '') + v.toLocaleString(undefined, fmtConfig) + (currentUnit === '원' ? '원' : '');
+
+    document.getElementById('resBuy').innerText = curFmt(bFinal);
+    document.getElementById('resSell').innerText = curFmt(sFinal);
+    document.getElementById('resFee').innerText = curFmt(bFeeVal + sFeeVal);
+    document.getElementById('resProfit').innerText = curFmt(profit);
+    document.getElementById('resRate').innerText = rate.toFixed(2) + "%";
+
+    // 수익/손실 색상 (수익 빨강, 손실 파랑)
+    const color = profit >= 0 ? "#f04452" : "#3182f6";
+    document.querySelectorAll('.profit-val').forEach(el => el.style.color = color);
+    
+    document.getElementById('resultBox').style.display = 'block';
+}
+
+// 초기 로딩 시 달러로 세팅
+setCurrency('$');
+</script>
+
+</body>
+</html>
