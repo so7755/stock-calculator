@@ -2,9 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>주식 수익률 계산기 </title>
+    <title>주식 수익률 계산기</title>
     <style>
-        /* 폰트: 상업적 이용 가능한 무료 폰트 (Pretendard) 및 시스템 기본 폰트 적용 */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
         body { font-family: 'Pretendard', -apple-system, sans-serif; padding: 10px; background-color: #f2f4f6; color: #333; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
@@ -14,27 +13,21 @@
         .input-row { margin-bottom: 18px; }
         label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #4e5968; }
         
-        /* 3. 통화 단위 선택 버튼 (요청 3 반영: 버튼형) */
         .currency-toggle { display: flex; gap: 8px; margin-bottom: 22px; }
         .currency-btn { flex: 1; padding: 14px; background-color: #f2f4f6; border: none; border-radius: 12px; color: #4e5968; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; outline: none; text-align: center; }
         .currency-btn.active { background-color: #3182f6; color: white; }
         
-        /* 입력창 컨트롤 박스 */
         .input-control { display: flex; align-items: center; background: #fafafa; border: 1px solid #e5e8eb; border-radius: 14px; padding: 4px 12px; }
         .input-wrapper { flex: 1; display: flex; align-items: center; justify-content: flex-end; position: relative; }
         
-        /* 입력창 스타일 */
         .input-control input { width: 100%; border: none; background: transparent; font-size: 16px; padding: 11px 0; outline: none; text-align: right; margin-right: 12px; font-family: inherit; }
         
-        /* 1. 상하 화살표 제거 (요청 1 반영: 크롬/에지/파이어폭스 대응) */
         .input-control input::-webkit-outer-spin-button,
         .input-control input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .input-control input[type=number] { -moz-appearance: textfield; }
 
-        /* 2. 단위 텍스트 우측 정렬 (요청 2 반영: -+ 버튼 바로 옆 딱 붙게) */
         .unit-text { font-size: 15px; color: #4e5968; pointer-events: none; flex-shrink: 0; white-space: nowrap; }
         
-        /* 우측 - + 버튼 그룹 */
         .btn-group { display: flex; gap: 5px; border-left: 1px solid #e5e8eb; padding-left: 10px; margin-left: 12px; }
         .btn-step { width: 34px; height: 34px; border: none; background: #fff; font-size: 20px; color: #3182f6; cursor: pointer; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
         .btn-step:active { background: #e8f3ff; }
@@ -78,20 +71,6 @@
     </div>
 
     <div class="input-row">
-        <label>매수 수량</label>
-        <div class="input-control">
-            <div class="input-wrapper">
-                <input type="number" id="buyQty" value="1">
-                <span class="unit-text">주</span>
-            </div>
-            <div class="btn-group">
-                <button class="btn-step" onclick="step('buyQty', -1)">−</button>
-                <button class="btn-step" onclick="step('buyQty', 1)">+</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="input-row">
         <label>매도 가격</label>
         <div class="input-control">
             <div class="input-wrapper">
@@ -106,15 +85,15 @@
     </div>
 
     <div class="input-row">
-        <label>매도 수량</label>
+        <label>매수/매도 수량</label>
         <div class="input-control">
             <div class="input-wrapper">
-                <input type="number" id="sellQty" value="1">
+                <input type="number" id="tradeQty" value="1">
                 <span class="unit-text">주</span>
             </div>
             <div class="btn-group">
-                <button class="btn-step" onclick="step('sellQty', -1)">−</button>
-                <button class="btn-step" onclick="step('sellQty', 1)">+</button>
+                <button class="btn-step" onclick="step('tradeQty', -1)">−</button>
+                <button class="btn-step" onclick="step('tradeQty', 1)">+</button>
             </div>
         </div>
     </div>
@@ -159,9 +138,8 @@
 </div>
 
 <script>
-let currentUnit = '$'; // 전역 변수로 현재 통화 관리
+let currentUnit = '$';
 
-// 3. 통화 단위 선택 버튼 로직 (요청 3 반영: 버튼형)
 function setCurrency(unit) {
     currentUnit = unit;
     
@@ -169,61 +147,60 @@ function setCurrency(unit) {
     document.getElementById('btnUsd').classList.toggle('active', unit === '$');
     document.getElementById('btnKrw').classList.toggle('active', unit === '원');
     
-    // 입력창 내부 단위 텍스트 변경
+    // 단위 레이블 변경
     const currencyLabels = document.querySelectorAll('.currency-label');
     const labelText = unit === '$' ? "달러" : "원";
     currencyLabels.forEach(el => el.innerText = labelText);
     
-    // 원화로 변경 시 기존 소수점 가격 반올림 처리
+    // [핵심 변경] 모든 입력값 초기화
+    const bpEl = document.getElementById('buyPrice');
+    const spEl = document.getElementById('sellPrice');
+    const qtyEl = document.getElementById('tradeQty');
+    
     if(unit === '원') {
-        const bpEl = document.getElementById('buyPrice');
-        const spEl = document.getElementById('sellPrice');
-        bpEl.value = Math.round(parseFloat(bpEl.value) || 0);
-        spEl.value = Math.round(parseFloat(spEl.value) || 0);
+        bpEl.value = "0";
+        spEl.value = "0";
+    } else {
+        bpEl.value = "0.00";
+        spEl.value = "0.00";
     }
+    qtyEl.value = "1"; // 수량은 기본 1로 초기화
+    
+    // 결과창 숨기기 (새로운 계산 유도)
+    document.getElementById('resultBox').style.display = 'none';
 }
 
 function step(id, val) {
     const el = document.getElementById(id);
     let curr = parseFloat(el.value) || 0;
-    
     let stepVal = val;
-    // 가격 조정 시 통화에 따른 증감폭 설정 (요청 2 반영: 원화는 10원 단위, 달러는 0.01달러 단위)
+
     if(id === 'buyPrice' || id === 'sellPrice') {
-        if(currentUnit === '원') {
-            stepVal = val * 10;
-        } else {
-            stepVal = val * 0.01;
-        }
+        stepVal = currentUnit === '원' ? val * 10 : val * 0.01;
     }
 
-    // 소수점 자리수 결정 (수량 및 원화 가격은 소수점 없음)
-    const decimals = (currentUnit === '원' && (id === 'buyPrice' || id === 'sellPrice')) || id.includes('Qty') ? 0 : 2;
+    const decimals = (currentUnit === '원' && (id === 'buyPrice' || id === 'sellPrice')) || id === 'tradeQty' ? 0 : 2;
     el.value = (curr + stepVal).toFixed(decimals);
 }
 
 function calculate() {
     const bPrice = parseFloat(document.getElementById('buyPrice').value) || 0;
-    const bQty = parseFloat(document.getElementById('buyQty').value) || 0;
     const sPrice = parseFloat(document.getElementById('sellPrice').value) || 0;
-    const sQty = parseFloat(document.getElementById('sellQty').value) || 0;
+    const qty = parseFloat(document.getElementById('tradeQty').value) || 0;
     const bFeeR = (parseFloat(document.getElementById('buyFee').value) || 0) / 100;
     const sFeeR = (parseFloat(document.getElementById('sellFee').value) || 0) / 100;
 
-    // 매수 비용 계산 (원금 + 수수료)
-    const bTotalRaw = bPrice * bQty;
+    const bTotalRaw = bPrice * qty;
     const bFeeVal = bTotalRaw * bFeeR;
     const bFinal = bTotalRaw + bFeeVal;
 
-    // 매도 수령액 계산 (원금 - 수수료)
-    const sTotalRaw = sPrice * sQty;
+    const sTotalRaw = sPrice * qty;
     const sFeeVal = sTotalRaw * sFeeR;
     const sFinal = sTotalRaw - sFeeVal;
 
     const profit = sFinal - bFinal;
     const rate = bFinal !== 0 ? (profit / bFinal) * 100 : 0;
 
-    // 결과 출력 포맷팅 (달러 소수점 2자리, 원화 정수)
     const fmtConfig = { minimumFractionDigits: currentUnit === '$' ? 2 : 0, maximumFractionDigits: 2 };
     const curFmt = (v) => (currentUnit === '$' ? '$' : '') + v.toLocaleString(undefined, fmtConfig) + (currentUnit === '원' ? '원' : '');
 
@@ -233,14 +210,12 @@ function calculate() {
     document.getElementById('resProfit').innerText = curFmt(profit);
     document.getElementById('resRate').innerText = rate.toFixed(2) + "%";
 
-    // 수익/손실 색상 (수익 빨강, 손실 파랑)
     const color = profit >= 0 ? "#f04452" : "#3182f6";
     document.querySelectorAll('.profit-val').forEach(el => el.style.color = color);
-    
     document.getElementById('resultBox').style.display = 'block';
 }
 
-// 초기 로딩 시 달러로 세팅
+// 최초 로딩 시 초기화 (달러 기준)
 setCurrency('$');
 </script>
 
